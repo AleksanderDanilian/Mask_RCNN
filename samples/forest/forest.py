@@ -59,14 +59,14 @@ class BalloonConfig(Config):
     Derives from the base Config class and overrides some values.
     """
     # Give the configuration a recognizable name
-    NAME = "balloon"
+    NAME = "forest"
 
     # We use a GPU with 12GB memory, which can fit two images.
     # Adjust down if you use a smaller GPU.
     IMAGES_PER_GPU = 2
 
     # Number of classes (including background)
-    NUM_CLASSES = 1 + 1  # Background + balloon
+    NUM_CLASSES = 1 + 2  # Background + wood + sign
 
     # Number of training steps per epoch
     STEPS_PER_EPOCH = 2 # было 100
@@ -74,7 +74,7 @@ class BalloonConfig(Config):
     VALIDATION_STEPS = 2 # было 50
 
     # Skip detections with < 90% confidence
-    DETECTION_MIN_CONFIDENCE = 0.3
+    DETECTION_MIN_CONFIDENCE = 0.3 # было 0.9
 
 
 ############################################################
@@ -89,29 +89,94 @@ class BalloonDataset(utils.Dataset):
         subset: Subset to load: train or val
         """
         # Add classes. We have only one class to add.
-        self.add_class("balloon", 1, "balloon")
+        self.add_class("wood", 1, "wood")
+        self.add_class("sign", 2, "sign")
 
         # Train or validation dataset?
         assert subset in ["train", "val"]
         dataset_dir = os.path.join(dataset_dir, subset)
 
         # Load annotations
-        # VGG Image Annotator (up to version 1.6) saves each image in the form:
-        # { 'filename': '28503151_5b5b7ec140_b.jpg',
-        #   'regions': {
-        #       '0': {
-        #           'region_attributes': {},
-        #           'shape_attributes': {
-        #               'all_points_x': [...],
-        #               'all_points_y': [...],
-        #               'name': 'polygon'}},
-        #       ... more regions ...
-        #   },
-        #   'size': 100202
-        # }
+        # VGG Image Annotator saves each image in the form (coco format):
+        #         {
+        #           "info": {
+        #             "year": 2022,
+        #            "version": "1.0",
+        #            "description": "VIA project exported to COCO format using VGG Image Annotator (http://www.robots.ox.ac.uk/~vgg/software/via/)",
+        #            "contributor": "",
+        #            "url": "http://www.robots.ox.ac.uk/~vgg/software/via/",
+        #            "date_created": "Wed Jan 12 2022 16:56:04 GMT+0300 (\u041c\u043e\u0441\u043a\u0432\u0430, \u0441\u0442\u0430\u043d\u0434\u0430\u0440\u0442\u043d\u043e\u0435 \u0432\u0440\u0435\u043c\u044f)"
+        #          },
+        #          "images": [
+        #            {
+        #              "id": 0,
+        #              "width": 1024,
+        #              "height": 768,
+        #              "file_name": "0.jpg",
+        #              "license": 0,
+        #              "date_captured": ""
+        #            },
+        #            {
+        #              "id": 1,
+        #              "width": 800,
+        #              "height": 533,
+        #              "file_name": "1.jpg",
+        #              "license": 0,
+        #              "date_captured": ""
+        #            },
+        #            {
+        #              "id": 2,
+        #              "width": 960,
+        #              "height": 720,
+        #              "file_name": "2.jpg",
+        #              "license": 0,
+        #              "date_captured": ""
+        #            },
+        #            {
+        #              "id": 3,
+        #               "width": 971,
+        #              "height": 643,
+        #              "file_name": "3.jpg",
+        #              "license": 0,
+        #              "date_captured": ""
+        #            }
+        #          ],
+        #          "annotations": [
+        #            {
+        #              "segmentation": [
+        #                [
+        #                  344,
+        #                  148,
+        #                  345,
+        #                  149,
+        #                  ...
+        #                ]
+        #              ],
+        #              "area": 2500,
+        #              "bbox": [
+        #                294,
+        #                123,
+        #                50,
+        #                50
+        #              ],
+        #              "iscrowd": 0,
+        #              "id": 1,
+        #              "image_id": 0,
+        #              "category_id": null
+        #            },
+        #            {
+        #              "segmentation": [
+        #                [
+        #                  399,
+        #                  167,
+        #                  398.897,
+        #                  168,
+        #                  ...
+        #                ]
+        
         # We mostly care about the x and y coordinates of each region
         # Note: In VIA 2.0, regions was changed from a dict to a list.
-        annotations = json.load(open(os.path.join(dataset_dir, "via_region_data.json")))
+        annotations = json.load(open(os.path.join(dataset_dir, "train_coco.json"))) # change name
         annotations = list(annotations.values())  # don't need the dict keys
 
         # The VIA tool saves images in the JSON even if they don't have any
@@ -121,8 +186,8 @@ class BalloonDataset(utils.Dataset):
         # Add images
         for a in annotations:
             # Get the x, y coordinaets of points of the polygons that make up
-            # the outline of each object instance. These are stores in the
-            # shape_attributes (see json format above)
+            # the outline of each object instance. These are stored in the
+            # shape_attributes (see json format above) # stored in annotations['segmentation']
             # The if condition is needed to support VIA versions 1.x and 2.x.
             if type(a['regions']) is dict:
                 polygons = [r['shape_attributes'] for r in a['regions'].values()]
