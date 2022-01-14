@@ -42,6 +42,24 @@ sys.path.append(ROOT_DIR)  # To find local version of the library
 from mrcnn.config import Config
 from mrcnn import model as modellib, utils
 
+
+
+# Root directory of the project
+ROOT_DIR = os.path.abspath("../../")
+print(ROOT_DIR)
+print(sys.path)
+# Import Mask RCNN
+sys.path.append(ROOT_DIR)  # To find local version of the library
+print(sys.path)
+sys.path = '/content/Mask_RCNN/'
+print(sys.path)
+print(os.getcwd())
+os.chdir('/content/Mask_RCNN/')
+print(sys.path)
+print(os.getcwd())
+from mrcnn.config import Config
+from mrcnn import model as modellib, utils
+
 # Path to trained weights file
 COCO_WEIGHTS_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
 
@@ -54,7 +72,7 @@ DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 ############################################################
 
 
-class BalloonConfig(Config):
+class ForestConfig(Config):
     """Configuration for training on the toy  dataset.
     Derives from the base Config class and overrides some values.
     """
@@ -66,7 +84,7 @@ class BalloonConfig(Config):
     IMAGES_PER_GPU = 2
 
     # Number of classes (including background)
-    NUM_CLASSES = 1 + 2  # Background + wood + sign
+    NUM_CLASSES = 1 + 1  # Background + wood
 
     # Number of training steps per epoch
     STEPS_PER_EPOCH = 2 # было 100
@@ -81,178 +99,108 @@ class BalloonConfig(Config):
 #  Dataset
 ############################################################
 
-class BalloonDataset(utils.Dataset):
+class ForestDataset(utils.Dataset):
 
-    def load_balloon(self, dataset_dir, subset):
+    def load_forest(self, dataset_dir, subset):
         """Load a subset of the Balloon dataset.
         dataset_dir: Root directory of the dataset.
         subset: Subset to load: train or val
         """
-        # Add classes. We have only one class to add.
-        self.add_class("wood", 1, "wood")
-        self.add_class("sign", 2, "sign")
-
+        # Add classes. We have 2 class to add.
+        self.add_class("forest", 1, "wood")
+        # self.add_class("forest", 2, "sign")
+                
         # Train or validation dataset?
         assert subset in ["train", "val"]
         dataset_dir = os.path.join(dataset_dir, subset)
 
-        # Load annotations
-        # VGG Image Annotator saves each image in the form (coco format):
-        #         {
-        #           "info": {
-        #             "year": 2022,
-        #            "version": "1.0",
-        #            "description": "VIA project exported to COCO format using VGG Image Annotator (http://www.robots.ox.ac.uk/~vgg/software/via/)",
-        #            "contributor": "",
-        #            "url": "http://www.robots.ox.ac.uk/~vgg/software/via/",
-        #            "date_created": "Wed Jan 12 2022 16:56:04 GMT+0300 (\u041c\u043e\u0441\u043a\u0432\u0430, \u0441\u0442\u0430\u043d\u0434\u0430\u0440\u0442\u043d\u043e\u0435 \u0432\u0440\u0435\u043c\u044f)"
-        #          },
-        #          "images": [
-        #            {
-        #              "id": 0,
-        #              "width": 1024,
-        #              "height": 768,
-        #              "file_name": "0.jpg",
-        #              "license": 0,
-        #              "date_captured": ""
-        #            },
-        #            {
-        #              "id": 1,
-        #              "width": 800,
-        #              "height": 533,
-        #              "file_name": "1.jpg",
-        #              "license": 0,
-        #              "date_captured": ""
-        #            },
-        #            {
-        #              "id": 2,
-        #              "width": 960,
-        #              "height": 720,
-        #              "file_name": "2.jpg",
-        #              "license": 0,
-        #              "date_captured": ""
-        #            },
-        #            {
-        #              "id": 3,
-        #               "width": 971,
-        #              "height": 643,
-        #              "file_name": "3.jpg",
-        #              "license": 0,
-        #              "date_captured": ""
-        #            }
-        #          ],
-        #          "annotations": [
-        #            {
-        #              "segmentation": [
-        #                [
-        #                  344,
-        #                  148,
-        #                  345,
-        #                  149,
-        #                  ...
-        #                ]
-        #              ],
-        #              "area": 2500,
-        #              "bbox": [
-        #                294,
-        #                123,
-        #                50,
-        #                50
-        #              ],
-        #              "iscrowd": 0,
-        #              "id": 1,
-        #              "image_id": 0,
-        #              "category_id": null
-        #            },
-        #            {
-        #              "segmentation": [
-        #                [
-        #                  399,
-        #                  167,
-        #                  398.897,
-        #                  168,
-        #                  ...
-        #                ]
-        
         # We mostly care about the x and y coordinates of each region
-        # Note: In VIA 2.0, regions was changed from a dict to a list.
-        annotations = json.load(open(os.path.join(dataset_dir, "train_coco.json"))) # change name
-        annotations = list(annotations.values())  # don't need the dict keys
+        annot = json.load(open(os.path.join(dataset_dir, "train_coco.json")))
+        annot = list(annot.values())  # don't need the dict keys
+        annot_len = len(annot[1]) #amt of imgs
+        
+        coords = [[] for i in range(annot_len)]
+        im_p = [0 for i in range(annot_len)]
+        h = [0 for i in range(annot_len)]
+        w = [0 for i in range(annot_len)]
+        im_id = [0 for i in range(annot_len)]
+        # cl = [0 for i in range(len(annot[2]))] #общее кол-во обьектов
 
-        # The VIA tool saves images in the JSON even if they don't have any
-        # annotations. Skip unannotated images.
-        annotations = [a for a in annotations if a['regions']]
+        for j in range(annot_len):
+          for i in range(len(annot[2])):
+            if annot[2][i]['image_id']==j:
+              coords[j].append(annot[2][i]['segmentation'][0])
+              im_p[j]=os.path.join(dataset_dir, annot[1][j]['file_name'])
+              im_id[j]=annot[1][j]['file_name']
+              h[j]=annot[1][j]['height']
+              w[j]=annot[1][j]['width']
+              # cl[i]=annot[][][''] # в cоcо формате не сохраняются атрибуты в VGA annotator
 
-        # Add images
-        for a in annotations:
-            # Get the x, y coordinaets of points of the polygons that make up
-            # the outline of each object instance. These are stored in the
-            # shape_attributes (see json format above) # stored in annotations['segmentation']
-            # The if condition is needed to support VIA versions 1.x and 2.x.
-            if type(a['regions']) is dict:
-                polygons = [r['shape_attributes'] for r in a['regions'].values()]
-            else:
-                polygons = [r['shape_attributes'] for r in a['regions']] 
+        for i in range(len(annot[1])):
 
-            # load_mask() needs the image size to convert polygons to masks.
-            # Unfortunately, VIA doesn't include it in JSON, so we must read
-            # the image. This is only managable since the dataset is tiny.
-            image_path = os.path.join(dataset_dir, a['filename'])
-            image = skimage.io.imread(image_path)
-            height, width = image.shape[:2]
+          self.add_image(
+            "forest",
+            image_id=im_id[i],  # use file name as a unique image id
+            path=im_p[i],
+            width=w[i], height=h[i],
+            polygons=coords[i])
 
-            self.add_image(
-                "balloon",
-                image_id=a['filename'],  # use file name as a unique image id
-                path=image_path,
-                width=width, height=height,
-                polygons=polygons)
+        return annot, coords, im_p, h, w, im_id
 
     def load_mask(self, image_id):
         """Generate instance masks for an image.
-       Returns:
+        Returns:
         masks: A bool array of shape [height, width, instance count] with
             one mask per instance.
         class_ids: a 1D array of class IDs of the instance masks.
         """
         # If not a balloon dataset image, delegate to parent class.
         image_info = self.image_info[image_id]
-        if image_info["source"] != "balloon":
+        print('image_info')
+        print(image_info)
+        if image_info["source"] != "forest":
             return super(self.__class__, self).load_mask(image_id)
 
         # Convert polygons to a bitmap mask of shape
         # [height, width, instance_count]
         info = self.image_info[image_id]
+
         mask = np.zeros([info["height"], info["width"], len(info["polygons"])],
                         dtype=np.uint8)
+        
         for i, p in enumerate(info["polygons"]):
-            # Get indexes of pixels inside the polygon and set them to 1
-            rr, cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'], mask.shape)
-            mask[rr, cc, i] = 1
+          x_coords = p[::2]
+          y_coords = p[1::2]
+
+          # Get indexes of pixels inside the polygon and set them to 1
+          rr, cc = skimage.draw.polygon(y_coords, x_coords)
+          mask[rr, cc, i] = 1 # для каждого набора полигонов i (x и y коорды), заполняем единицами маску.
 
         # Return mask, and array of class IDs of each instance. Since we have
         # one class ID only, we return an array of 1s
-        return mask.astype(np.bool), np.ones([mask.shape[-1]], dtype=np.int32)
+        # class_ids = np.array([self.class_names.index(i[0]) for i in image_info]) # здесь храним классы
+
+        return mask, np.ones([mask.shape[-1]], dtype=np.int32)
 
     def image_reference(self, image_id):
-        """Return the path of the image."""
-        info = self.image_info[image_id]
-        if info["source"] == "balloon":
-            return info["path"]
-        else:
-            super(self.__class__, self).image_reference(image_id)
+            """Return the path of the image."""
+            info = self.image_info[image_id]
+            if info["source"] == "forest":
+                return info["path"]
+            else:
+                    super(self.__class__, self).image_reference(image_id)
 
 
 def train(model):
     """Train the model."""
     # Training dataset.
-    dataset_train = BalloonDataset()
-    dataset_train.load_balloon(args.dataset, "train")
+    dataset_train = ForestDataset()
+    dataset_train.load_forest(args.dataset, "train")
     dataset_train.prepare()
 
     # Validation dataset
-    dataset_val = BalloonDataset()
-    dataset_val.load_balloon(args.dataset, "val")
+    dataset_val = ForestDataset()
+    dataset_val.load_forest(args.dataset, "val")
     dataset_val.prepare()
 
     # *** This training schedule is an example. Update to your needs ***
@@ -264,6 +212,15 @@ def train(model):
                 learning_rate=config.LEARNING_RATE,
                 epochs=30,
                 layers='heads')
+
+def image_reference(self, image_id):
+    """Return the path of the image."""
+    info = self.image_info[image_id]
+    if info["source"] == "balloon":
+        return info["path"]
+    else:
+        super(self.__class__, self).image_reference(image_id)
+
 
 
 def color_splash(image, mask):
@@ -382,9 +339,9 @@ if __name__ == '__main__':
 
     # Configurations
     if args.command == "train":
-        config = BalloonConfig()
+        config = ForestConfig()
     else:
-        class InferenceConfig(BalloonConfig):
+        class InferenceConfig(ForestConfig):
             # Set batch size to 1 since we'll be running inference on
             # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
             GPU_COUNT = 1
